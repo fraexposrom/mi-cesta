@@ -26,18 +26,18 @@
   --f-display:"Bricolage Grotesque", "Arial Rounded MT Bold", system-ui, sans-serif;
   --f-body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
   --shadow:0 1px 2px rgba(26,33,23,.06), 0 6px 20px rgba(26,33,23,.06);
-  --nav-h:64px; --sum-up:#F2A59B; --sum-down:#A9DDB0;
+  --nav-h:64px; --sum-up:#F2A59B; --sum-down:#A9DDB0; --fav:#A8741A; --fav-soft:#F6ECD6;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --bg:#111510; --surface:#1A2018; --sunk:#232A21; --ink:#E8EDE3; --muted:#9AA592; --line:#2E372B;
   --accent:#8CCB93; --accent-ink:#10200F; --accent-soft:#223523; --danger:#F08A7E; --danger-soft:#3A1F1C;
   --s-mercadona:#5CC58A; --s-lidl:#E8C04A; --s-carrefour:#7FA2F0; --s-coviran:#F07A6E; --s-aldi:#F29A5C;
-  --shadow:0 1px 2px rgba(0,0,0,.3); --sum-up:#B3362B; --sum-down:#2F6B3A; color-scheme:dark }}
+  --shadow:0 1px 2px rgba(0,0,0,.3); --sum-up:#B3362B; --sum-down:#2F6B3A; --fav:#E2B65C; --fav-soft:#3A3020; color-scheme:dark }}
 :root[data-theme="dark"]{
   --bg:#111510; --surface:#1A2018; --sunk:#232A21; --ink:#E8EDE3; --muted:#9AA592; --line:#2E372B;
   --accent:#8CCB93; --accent-ink:#10200F; --accent-soft:#223523; --danger:#F08A7E; --danger-soft:#3A1F1C;
   --s-mercadona:#5CC58A; --s-lidl:#E8C04A; --s-carrefour:#7FA2F0; --s-coviran:#F07A6E; --s-aldi:#F29A5C;
-  --shadow:0 1px 2px rgba(0,0,0,.3); --sum-up:#B3362B; --sum-down:#2F6B3A; color-scheme:dark }
+  --shadow:0 1px 2px rgba(0,0,0,.3); --sum-up:#B3362B; --sum-down:#2F6B3A; --fav:#E2B65C; --fav-soft:#3A3020; color-scheme:dark }
 :root{--accent-soft-b:color-mix(in srgb, var(--accent) 16%, var(--surface))}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.4;-webkit-tap-highlight-color:transparent}
@@ -209,6 +209,16 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border
 .suprow{display:flex;align-items:center;gap:10px;padding:12px 2px;background:none;border:0;border-bottom:1px solid var(--line);text-align:left;font-weight:600;font-size:15px}
 .suprow span:nth-of-type(1){flex:1}
 .suprow.off{opacity:.55}
+.fav{font-size:11px;font-weight:700;color:var(--fav);background:var(--fav-soft);border-radius:999px;padding:1px 8px;white-space:nowrap}
+.star{color:var(--fav)}
+.favchip[aria-pressed="false"]{color:var(--fav)}
+.alt.favalt{color:var(--fav)} .alt.favalt .swap{border-color:var(--fav);color:var(--fav)}
+.alt.soft{color:var(--muted);font-weight:500}
+.favbox{gap:8px}
+.favtoggle{display:flex;align-items:center;gap:10px;width:100%;border:1.5px dashed var(--line);background:var(--bg);border-radius:12px;padding:11px 14px;font-weight:700;font-size:15px;text-align:left}
+.favtoggle .st{font-size:20px;line-height:1;color:var(--fav)}
+.favtoggle[aria-pressed="true"]{border-style:solid;border-color:var(--fav);background:var(--fav-soft)}
+
 .check .name{display:block;font-weight:600}
 @media (max-width:380px){.form{grid-template-columns:1fr}}
 
@@ -289,6 +299,23 @@ function cheaper(p){
   return alternatives(p).filter(o=>o.b.v < b.v - 0.005).sort((a,c)=>a.b.v-c.b.v)[0] || null;
 }
 const isCheapest = p => alternatives(p).length>0 && !cheaper(p);
+
+/* ---------- Favoritos (de cada persona) ---------- */
+const myFavs = () => ((data.favs||{})[meKey()] || {items:{}}).items;
+const isFav = p => !!p && Object.prototype.hasOwnProperty.call(myFavs(), p.id);
+const favOthers = p => Object.entries(data.favs||{}).filter(([k,f])=>k!==meKey() && Object.prototype.hasOwnProperty.call(f.items, p.id)).map(([k,f])=>f.nombre||k);
+function setFav(pid, on){
+  const items = {...myFavs()};
+  if(on) items[pid] = 1; else delete items[pid];
+  data.favs = {...(data.favs||{}), [meKey()]:{nombre:me(), items, upd:Date.now()}};
+}
+/* Si el producto tiene equivalentes y uno de ellos es tu favorito, lo devuelve. */
+function favAlternative(p){
+  if(!p || !p.comparar || isFav(p)) return null;
+  const k = norm(p.comparar);
+  return data.productos.find(x=>x.id!==p.id && x.comparar && norm(x.comparar)===k && isFav(x)) || null;
+}
+const favChip = p => isFav(p) ? `<span class="fav">★ Favorito</span>` : "";
 const fmtQty = p => {
   const short = {gramos:"g",kilos:"kg",mililitros:"ml",litros:"l",unidades:"ud"}[p.unidad] || "";
   return p.cantidad ? `${String(p.cantidad).replace(".",",")} ${short}` : "";
@@ -304,7 +331,7 @@ const LS = {
   set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
   del(k){ try{ localStorage.removeItem(k); }catch(e){} }
 };
-const emptyData = () => ({version:2, productos:[], listas:[], compras:{}, supers:[], borrados:{}});
+const emptyData = () => ({version:2, productos:[], listas:[], compras:{}, favs:{}, supers:[], borrados:{}});
 /* Perfil de este dispositivo: separa la compra y las listas de cada persona de la familia. */
 const me = () => (cfg && cfg.perfil) || "";
 const meKey = () => norm(me()).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || "yo";
@@ -329,6 +356,8 @@ function normalize(d){
   });
   const cs = (d.compras && typeof d.compras==="object") ? d.compras : {};
   for(const [k,c] of Object.entries(cs)) if(c && typeof c.items==="object") out.compras[k] = {items:{...c.items}, upd:Number(c.upd)||0};
+  const fv = (d.favs && typeof d.favs==="object") ? d.favs : {};
+  for(const [k,f] of Object.entries(fv)) if(f && typeof f.items==="object") out.favs[k] = {nombre:String(f.nombre||k), items:{...f.items}, upd:Number(f.upd)||0};
   // Versión anterior: una sola compra para todos. Se la queda la primera persona que abra la app.
   if(d.compra && d.compra.items && Object.keys(d.compra.items).length && !out.compras._previa)
     out.compras._previa = {items:{...d.compra.items}, upd:Number(d.compra.upd)||0};
@@ -365,11 +394,14 @@ function merge(local, remote){
   for(const l of local.listas) lm.set(l.id, lm.has(l.id) ? mergeList(l, lm.get(l.id)) : l);
   const compras = {...remote.compras};
   for(const [k,c] of Object.entries(local.compras||{})) if(!compras[k] || (c.upd||0) >= (compras[k].upd||0)) compras[k] = c;
+  const favs = {...(remote.favs||{})};
+  for(const [k,f] of Object.entries(local.favs||{})) if(!favs[k] || (f.upd||0) >= (favs[k].upd||0)) favs[k] = f;
   return {
     version:2,
     productos: mergeArr(local.productos, remote.productos),
     listas: [...lm.values()].filter(l => !(borr[l.id] >= (l.upd||0))),
     compras,
+    favs,
     supers: mergeArr(local.supers||[], remote.supers||[]),
     borrados: borr
   };
@@ -577,12 +609,13 @@ function filterBar(){
   return `<input class="search" id="q" type="search" placeholder="Buscar producto o categoría" value="${esc(qText)}" autocomplete="off" aria-label="Buscar">
   <div class="filters" role="group" aria-label="Filtrar por supermercado">
     <button class="fchip" data-f="Todos" aria-pressed="${fSuper==="Todos"}">Todos</button>
+    ${Object.keys(myFavs()).length ? `<button class="fchip favchip" data-f="__fav" aria-pressed="${fSuper==="__fav"}">★ Favoritos</button>` : ""}
     ${[...supersList(true).filter(s=>counts[s]), ...Object.keys(counts).filter(s=>!supersList(true).includes(s))].map(s=>`<button class="fchip" data-f="${esc(s)}" aria-pressed="${fSuper===s}"><span class="dot" style="--c:${scol(s)}"></span>${esc(s)}</button>`).join("")}
   </div>`;
 }
 function filtered(){
   const q = norm(qText);
-  return productos().filter(p => (fSuper==="Todos"||p.super===fSuper) && (!q || norm(p.nombre).includes(q) || norm(p.categoria).includes(q)));
+  return productos().filter(p => (fSuper==="Todos"||p.super===fSuper||(fSuper==="__fav" && isFav(p))) && (!q || norm(p.nombre).includes(q) || norm(p.categoria).includes(q)));
 }
 function groupByCat(arr){
   const g={}; arr.forEach(p=>{ const c=p.categoria||"Sin categoría"; (g[c] ||= []).push(p); });
@@ -610,12 +643,18 @@ function renderCompra(){
         const u = compra()[p.id]||0;
         return `<div class="row ${u?"inlist":""}">
           <div class="main"><div class="name">${esc(p.nombre)}</div>
-          <div class="meta"><span class="stag"><i class="dot" style="--c:${scol(p.super)}"></i>${esc(p.super)}</span><span>${esc(fmtQty(p))}</span><span class="num">${unitPrice(p)}</span>${isCheapest(p)?`<span class="best">Mejor precio</span>`:""}${trendChip(p)}</div>
+          <div class="meta"><span class="stag"><i class="dot" style="--c:${scol(p.super)}"></i>${esc(p.super)}</span><span>${esc(fmtQty(p))}</span><span class="num">${unitPrice(p)}</span>${favChip(p)}${isCheapest(p)?`<span class="best">Mejor precio</span>`:""}${trendChip(p)}</div>
 </div>
           <div class="pcol"><div class="price num">${money(p.precio)}</div></div>
           <div class="step">${u ? `<button class="sbtn" data-dec="${p.id}" aria-label="Quitar uno de ${esc(p.nombre)}">−</button><span class="qty num" aria-label="${u} unidades">${u}</span>` : ""}
           <button class="sbtn add" data-inc="${p.id}" aria-label="Añadir ${esc(p.nombre)}">+</button></div>
-          ${(()=>{ const ch = cheaper(p); return ch ? `<div class="alt"><span>Más barato en <b>${esc(ch.x.super)}</b>: ${esc(ch.x.nombre)} · ${money(ch.b.v)}/${ch.b.u}</span>${u?`<button class="swap" data-swap="${p.id}" data-to="${ch.x.id}">Cambiar</button>`:""}</div>` : ""; })()}</div>`;
+          ${(()=>{
+            const fa = favAlternative(p);
+            if(fa) return `<div class="alt favalt"><span>★ Tu favorito es <b>${esc(fa.nombre)}</b> (${esc(fa.super)})</span>${u?`<button class="swap" data-swap="${p.id}" data-to="${fa.id}">Cambiar</button>`:""}</div>`;
+            const ch = cheaper(p); if(!ch) return "";
+            if(isFav(p)) return `<div class="alt soft"><span>Es tu favorito. En <b>${esc(ch.x.super)}</b> sale más barato: ${money(ch.b.v)}/${ch.b.u}</span></div>`;
+            return `<div class="alt"><span>Más barato en <b>${esc(ch.x.super)}</b>: ${esc(ch.x.nombre)} · ${money(ch.b.v)}/${ch.b.u}</span>${u?`<button class="swap" data-swap="${p.id}" data-to="${ch.x.id}">Cambiar</button>`:""}</div>`;
+          })()}</div>`;
       }).join("") + `</div>`;
     });
   }
@@ -682,7 +721,7 @@ function renderListDetail(l){
     html += `<section class="sect"><div class="sect-h" style="--c:${scol(s)}"><h2><i class="dot" style="--c:${scol(s)}"></i>${esc(s)}</h2><span class="sub num" style="margin:0">${sd}/${is.length} · ${money(is.reduce((a,i)=>a+lineTotal(i),0))}</span></div>` +
       is.map(i=>{ const ch = i.pagado!=null && Number(i.pagado)!==Number(i.precio);
         return `<div class="crow"><button class="check" role="checkbox" aria-checked="${!!i.hecho}" data-chk="${i.idx}" ${closed?"disabled":""}>
-        <span class="box"></span><span class="main"><span class="name">${esc(i.nombre)}</span><span class="meta">${i.uds} × ${money(paid(i))}${i.categoria?` · ${esc(i.categoria)}`:""}${i.hecho && i.por ? ` · <b class="by">${i.por===me() ? "cogido por ti" : `cogido por ${esc(i.por)}`}</b>` : ""}</span></span></button>
+        <span class="box"></span><span class="main"><span class="name">${esc(i.nombre)}${isFav(byId(i.pid))?` <span class="star" title="Tu favorito">★</span>`:""}</span><span class="meta">${i.uds} × ${money(paid(i))}${i.categoria?` · ${esc(i.categoria)}`:""}${i.hecho && i.por ? ` · <b class="by">${i.por===me() ? "cogido por ti" : `cogido por ${esc(i.por)}`}</b>` : ""}</span></span></button>
         <button class="pbtn ${ch?"changed":""}" data-price="${i.idx}" ${closed?"disabled":""} aria-label="Cambiar el precio de ${esc(i.nombre)}"><span class="price num">${money(lineTotal(i))}</span><span class="pedit">${ch ? `antes ${money(i.precio)}` : (closed ? "" : "precio")}</span></button></div>`; }).join("") + `</section>`;
   });
   app.innerHTML = html;
@@ -742,7 +781,7 @@ function renderProductos(){
     groupByCat(arr).forEach(([c,ps])=>{
       html += `<div class="cat"><span class="eyebrow">${esc(c)}</span><span class="sub" style="margin:0">${ps.length}</span></div><div class="list">` +
         ps.map(p=>`<button class="row" data-edit="${p.id}">
-          <div class="main"><div class="name">${esc(p.nombre)}</div><div class="meta"><span class="stag"><i class="dot" style="--c:${scol(p.super)}"></i>${esc(p.super)}</span><span>${esc(fmtQty(p))}</span>${isCheapest(p)?`<span class="best">Mejor precio</span>`:""}${p.comparar?`<span>≈ ${esc(p.comparar)}</span>`:""}</div></div>
+          <div class="main"><div class="name">${esc(p.nombre)}</div><div class="meta"><span class="stag"><i class="dot" style="--c:${scol(p.super)}"></i>${esc(p.super)}</span><span>${esc(fmtQty(p))}</span>${favChip(p)}${isCheapest(p)?`<span class="best">Mejor precio</span>`:""}${p.comparar?`<span>≈ ${esc(p.comparar)}</span>`:""}</div></div>
           <div class="pcol"><div class="price num">${money(p.precio)} ${trendChip(p)}</div><div class="unitp num">${unitPrice(p)}</div></div></button>`).join("") + `</div>`;
     });
   }
@@ -787,7 +826,7 @@ function renderAjustes(){
   app.innerHTML = html; setBar("");
 }
 
-const SAMPLE = {"version": 1, "productos": [{"id": "p01", "super": "Mercadona", "nombre": "Leche entera Hacendado", "precio": 0.95, "categoria": "Lácteos", "cantidad": 1, "unidad": "litros", "comparar": "Leche entera"}, {"id": "p02", "super": "Lidl", "nombre": "Pan de molde integral", "precio": 1.29, "categoria": "Panadería", "cantidad": 450, "unidad": "gramos"}, {"id": "p03", "super": "Carrefour", "nombre": "Aceite de oliva virgen extra", "precio": 8.49, "categoria": "Aceites", "cantidad": 1, "unidad": "litros", "historial": [{"precio": 7.99, "fecha": "2026-09-12"}]}, {"id": "p04", "super": "Coviran", "nombre": "Arroz redondo", "precio": 1.15, "categoria": "Despensa", "cantidad": 1, "unidad": "kilos"}, {"id": "p05", "super": "Aldi", "nombre": "Yogur natural pack 4", "precio": 0.89, "categoria": "Lácteos", "cantidad": 500, "unidad": "gramos"}, {"id": "p06", "super": "Mercadona", "nombre": "Zumo de naranja", "precio": 1.6, "categoria": "Bebidas", "cantidad": 1, "unidad": "litros"}, {"id": "p07", "super": "Lidl", "nombre": "Pechuga de pollo", "precio": 5.99, "categoria": "Carnes", "cantidad": 1, "unidad": "kilos", "historial": [{"precio": 6.29, "fecha": "2026-09-20"}]}, {"id": "p08", "super": "Carrefour", "nombre": "Agua mineral 1,5 L", "precio": 0.35, "categoria": "Bebidas", "cantidad": 1500, "unidad": "mililitros"}, {"id": "p09", "super": "Aldi", "nombre": "Tomate triturado", "precio": 0.79, "categoria": "Conservas", "cantidad": 800, "unidad": "gramos"}, {"id": "p10", "super": "Coviran", "nombre": "Café molido natural", "precio": 3.45, "categoria": "Desayuno", "cantidad": 250, "unidad": "gramos"}, {"id": "p11", "super": "Lidl", "nombre": "Leche entera Milbona", "precio": 0.89, "categoria": "Lácteos", "cantidad": 1, "unidad": "litros", "comparar": "Leche entera"}, {"id": "p12", "super": "Mercadona", "nombre": "Huevos camperos L", "precio": 2.85, "categoria": "Huevos", "cantidad": 12, "unidad": "unidades", "comparar": "Huevos L"}, {"id": "p13", "super": "Coviran", "nombre": "Huevos L docena", "precio": 2.49, "categoria": "Huevos", "cantidad": 12, "unidad": "unidades", "comparar": "Huevos L"}], "compra": {"items": {"p01": 2, "p03": 1, "p07": 1, "p12": 1}, "upd": 0}, "listas": [], "borrados": {}};
+const SAMPLE = {"version": 1, "productos": [{"id": "p01", "super": "Mercadona", "nombre": "Leche entera Hacendado", "precio": 0.95, "categoria": "Lácteos", "cantidad": 1, "unidad": "litros", "comparar": "Leche entera"}, {"id": "p02", "super": "Lidl", "nombre": "Pan de molde integral", "precio": 1.29, "categoria": "Panadería", "cantidad": 450, "unidad": "gramos"}, {"id": "p03", "super": "Carrefour", "nombre": "Aceite de oliva virgen extra", "precio": 8.49, "categoria": "Aceites", "cantidad": 1, "unidad": "litros", "historial": [{"precio": 7.99, "fecha": "2026-09-12"}]}, {"id": "p04", "super": "Coviran", "nombre": "Arroz redondo", "precio": 1.15, "categoria": "Despensa", "cantidad": 1, "unidad": "kilos"}, {"id": "p05", "super": "Aldi", "nombre": "Yogur natural pack 4", "precio": 0.89, "categoria": "Lácteos", "cantidad": 500, "unidad": "gramos"}, {"id": "p06", "super": "Mercadona", "nombre": "Zumo de naranja", "precio": 1.6, "categoria": "Bebidas", "cantidad": 1, "unidad": "litros"}, {"id": "p07", "super": "Lidl", "nombre": "Pechuga de pollo", "precio": 5.99, "categoria": "Carnes", "cantidad": 1, "unidad": "kilos", "historial": [{"precio": 6.29, "fecha": "2026-09-20"}]}, {"id": "p08", "super": "Carrefour", "nombre": "Agua mineral 1,5 L", "precio": 0.35, "categoria": "Bebidas", "cantidad": 1500, "unidad": "mililitros"}, {"id": "p09", "super": "Aldi", "nombre": "Tomate triturado", "precio": 0.79, "categoria": "Conservas", "cantidad": 800, "unidad": "gramos"}, {"id": "p10", "super": "Coviran", "nombre": "Café molido natural", "precio": 3.45, "categoria": "Desayuno", "cantidad": 250, "unidad": "gramos"}, {"id": "p11", "super": "Lidl", "nombre": "Leche entera Milbona", "precio": 0.89, "categoria": "Lácteos", "cantidad": 1, "unidad": "litros", "comparar": "Leche entera"}, {"id": "p12", "super": "Mercadona", "nombre": "Huevos camperos L", "precio": 2.85, "categoria": "Huevos", "cantidad": 12, "unidad": "unidades", "comparar": "Huevos L"}, {"id": "p13", "super": "Coviran", "nombre": "Huevos L docena", "precio": 2.49, "categoria": "Huevos", "cantidad": 12, "unidad": "unidades", "comparar": "Huevos L"}, {"id": "p14", "super": "Mercadona", "nombre": "Caldo de pollo Hacendado", "precio": 1.05, "categoria": "Caldos y sopas", "cantidad": 1, "unidad": "litros", "comparar": "Caldo de pollo"}, {"id": "p15", "super": "Lidl", "nombre": "Caldo casero de pollo", "precio": 1.39, "categoria": "Caldos y sopas", "cantidad": 1, "unidad": "litros", "comparar": "Caldo de pollo"}], "compra": {"items": {"p01": 2, "p03": 1, "p07": 1, "p12": 1}, "upd": 0}, "listas": [], "borrados": {}};
 
 async function connect(){
   const v = id => document.getElementById(id).value.trim();
@@ -899,6 +938,11 @@ function openProductSheet(p){
       <div class="field"><label for="f-uni">Unidad de medida</label><select id="f-uni">${UNITS.map(u=>`<option ${p.unidad===u?"selected":""}>${u}</option>`).join("")}</select></div>
       <div class="field span"><label for="f-comp">Comparar con (opcional)</label><input id="f-comp" list="comps" value="${esc(p.comparar||"")}" placeholder="Ej. Leche entera" autocomplete="off"><datalist id="comps">${[...new Set(productos().map(x=>x.comparar).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es")).map(c=>`<option value="${esc(c)}">`).join("")}</datalist>
         <span class="hint">Pon el mismo nombre en productos equivalentes de distintos supermercados y la app te dirá cuál sale más barato.</span></div>
+      <div class="field span favbox">
+        <button type="button" class="favtoggle" id="favT" aria-pressed="${isFav(p)}"><span class="st">${isFav(p)?"★":"☆"}</span><span class="ft">${isFav(p)?"Es uno de tus favoritos":"Marcar como favorito"}</span></button>
+        ${!isNew && favOthers(p).length ? `<span class="hint">También es favorito de ${favOthers(p).map(n=>`<b>${esc(n)}</b>`).join(", ")}.</span>` : ""}
+        <span class="hint">Si tiene equivalentes en otros súper («Comparar con»), la app te recordará que prefieres este aunque no sea el más barato.</span>
+      </div>
       <p class="err" id="ferr"></p>
       <button type="submit" hidden></button>
     </form>
@@ -909,8 +953,10 @@ function openProductSheet(p){
     </div>` : ""}
     <div class="actions">${isNew?`<button class="btn ghost" id="cancelP">Cancelar</button>`:`<button class="btn ghost" id="delP">Eliminar</button>`}<button class="btn" id="saveP">Guardar</button></div>
   </div></div>`;
-  let sup = p.super, delArmed = false;
+  let sup = p.super, delArmed = false, fav = !isNew && isFav(p);
   const close = () => root.innerHTML = "";
+  const favT = root.querySelector("#favT");
+  favT.onclick = ()=>{ fav = !fav; favT.setAttribute("aria-pressed", fav); favT.querySelector(".st").textContent = fav?"★":"☆"; favT.querySelector(".ft").textContent = fav?"Es uno de tus favoritos":"Marcar como favorito"; };
   root.querySelector("#scrim").addEventListener("click", e=>{ if(e.target.id==="scrim") close(); });
   const seg = root.querySelector("#segS"), ns = root.querySelector("#newSup"), nsi = root.querySelector("#f-newsup");
   seg.addEventListener("click", e=>{
@@ -932,6 +978,7 @@ function openProductSheet(p){
     if(!delArmed){ delArmed=true; d.textContent="¿Seguro? Toca otra vez"; d.className="btn danger"; return; }
     close();
     if(compra()[p.id]){ const items={...compra()}; delete items[p.id]; setCompraItems(items); }
+    if(isFav(p)) setFav(p.id, false);
     removeEntity("productos", p.id); toast("Producto eliminado");
   };
   const save = ()=>{
@@ -948,8 +995,13 @@ function openProductSheet(p){
     const base = {id:isNew?uid("p"):p.id, super:sup, nombre, categoria:root.querySelector("#f-cat").value.trim(), cantidad, unidad:root.querySelector("#f-uni").value,
       comparar:root.querySelector("#f-comp").value.trim(), historial:p.historial||[], precio:isNew ? Math.round(precio*100)/100 : p.precio,
       creadoPor:isNew ? me() : (p.creadoPor||""), editadoPor:isNew ? "" : (p.editadoPor||"")};
-    const item = {...(isNew ? base : {...setPrice(base, precio), editadoPor:me()}), upd:Date.now()};
+    const changed = isNew || ["super","nombre","categoria","cantidad","unidad","comparar"].some(k=>String(base[k])!==String(p[k]??"")) || Math.round(precio*100)/100!==Number(p.precio);
+    const item = isNew ? {...base, upd:Date.now()} : (changed ? {...setPrice(base, precio), editadoPor:me(), upd:Date.now()} : p);
+    const favChanged = fav!==(!isNew && isFav(p));
     close();
+    if(favChanged) setFav(item.id, fav);
+    if(!changed && !favChanged){ return; }
+    if(!changed){ commit(); toast(fav ? "Marcado como favorito" : "Quitado de favoritos"); return; }
     data.productos = isNew ? [...data.productos, item] : data.productos.map(x=>x.id===item.id ? item : x);
     commit(); toast(isNew?"Producto añadido":"Cambios guardados");
   };
@@ -1001,7 +1053,11 @@ document.addEventListener("click", e=>{
   if(t.dataset.inc){
     const id = t.dataset.inc, was = compra()[id]||0;
     setCompra(id, was+1);
-    if(!was){ const ch = cheaper(byId(id)); if(ch) toast(`Más barato en ${ch.x.super}: ${money(ch.b.v)}/${ch.b.u}`); }
+    if(!was){
+      const pr = byId(id), fa = favAlternative(pr), ch = cheaper(pr);
+      if(fa) toast(`★ Tu favorito es ${fa.nombre} (${fa.super})`);
+      else if(ch && !isFav(pr)) toast(`Más barato en ${ch.x.super}: ${money(ch.b.v)}/${ch.b.u}`);
+    }
     return;
   }
   if(t.dataset.swap){
